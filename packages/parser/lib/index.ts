@@ -74,11 +74,26 @@ export interface MethodResult {
 
 export interface ComputedResult {
   name: string
+  type?: string[]
   describe?: string[]
+  isFromStore: boolean
 }
 
 export interface MixInResult {
   mixIn: string
+}
+
+export interface DataResult {
+  name: string
+  type: string
+  describe?: string[]
+  default?: string
+}
+
+export interface WatchResult {
+  name: string
+  describe?: string[]
+  argumentsDesc?: string[]
 }
 
 export type AttrsMap = {
@@ -91,6 +106,7 @@ export interface SlotResult {
   backerDesc: string
   bindings: AttrsMap
   scoped: boolean
+  target: 'template' | 'script'
 }
 
 export interface ParserOptions {
@@ -109,6 +125,9 @@ export interface ParserOptions {
   onMixIn?: {
     (mixInRes: MixInResult): void
   }
+  onData?: {
+    (dataRes: DataResult): void
+  }
   onSlot?: {
     (slotRes: SlotResult): void
   }
@@ -118,7 +137,11 @@ export interface ParserOptions {
   onDesc?: {
     (desc: CommentResult): void
   }
+  onWatch?: {
+    (watch: WatchResult): void
+  }
   babelParserPlugins?: BabelParserPlugins
+  basedir?: string
 }
 
 export interface ParserResult {
@@ -128,6 +151,8 @@ export interface ParserResult {
   mixIns?: MixInResult[]
   methods?: MethodResult[]
   computed?: ComputedResult[]
+  data?: DataResult[]
+  watch?: WatchResult[]
   name?: string
   componentDesc?: CommentResult
 }
@@ -136,7 +161,7 @@ export function parser(
   source: string,
   options: ParserOptions = {}
 ): ParserResult {
-  const astRes = sfcToAST(source, options.babelParserPlugins)
+  const astRes = sfcToAST(source, options.babelParserPlugins, options.basedir)
   const res: ParserResult = {}
   const defaultOptions: ParserOptions = {
     onName(name: string) {
@@ -162,6 +187,12 @@ export function parser(
     },
     onComputed(computedRes: ComputedResult) {
       ;(res.computed || (res.computed = [])).push(computedRes)
+    },
+    onData(dataRes: DataResult) {
+      ;(res.data || (res.data = [])).push(dataRes)
+    },
+    onWatch(watchRes: WatchResult) {
+      ;(res.watch || (res.watch = [])).push(watchRes)
     }
   }
 

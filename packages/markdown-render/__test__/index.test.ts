@@ -33,7 +33,16 @@ test('Proper rendering of the table header', () => {
         describe: 'Table header',
         backerDesc: '`<th>{{title}}</th>`',
         bindings: {},
-        scoped: false
+        scoped: false,
+        target: 'template'
+      },
+      {
+        name: 'header',
+        describe: 'Table header',
+        backerDesc: '`<th>{{title}}</th>`',
+        bindings: {},
+        scoped: false,
+        target: 'script'
       }
     ],
     methods: [
@@ -41,6 +50,26 @@ test('Proper rendering of the table header', () => {
         name: 'clear',
         describe: ['Clear form'],
         argumentsDesc: ['a boolean value']
+      }
+    ],
+    mixIns: [
+      {
+        mixIn: 'MixIn'
+      }
+    ],
+    data: [
+      {
+        name: 'someVariable',
+        type: 'String',
+        describe: ['Does something'],
+        default: ''
+      }
+    ],
+    watch: [
+      {
+        name: 'question',
+        describe: ['Something about a question'],
+        argumentsDesc: ['a string value']
       }
     ]
   }

@@ -4,8 +4,10 @@ import {
   PropsResult,
   SlotResult,
   EventResult,
+  DataResult,
   MethodResult,
-  ComputedResult
+  ComputedResult,
+  WatchResult
 } from '@vuese/parser'
 import renderMarkdown, { MarkdownResult } from './renderMarkdown'
 
@@ -18,6 +20,8 @@ interface RenderOptions {
   methods: string[]
   computed: string[]
   mixIns: string[]
+  data: string[]
+  watch: string[]
 }
 
 export interface RenderResult {
@@ -27,6 +31,8 @@ export interface RenderResult {
   methods?: string
   computed?: string
   mixIns?: string
+  data?: string
+  watch?: string
 }
 
 export class Render {
@@ -41,8 +47,10 @@ export class Render {
         events: ['Event Name', 'Description', 'Parameters'],
         slots: ['Name', 'Description', 'Default Slot Content'],
         methods: ['Method', 'Description', 'Parameters'],
-        computed: ['Computed', 'Description'],
-        mixIns: ['MixIn']
+        computed: ['Computed', 'Type', 'Description', 'From Store'],
+        mixIns: ['MixIn'],
+        data: ['Name', 'Type', 'Description', 'Default'],
+        watch: ['Name', 'Description', 'Parameters']
       },
       this.options
     )
@@ -55,7 +63,9 @@ export class Render {
       events,
       methods,
       mixIns,
-      computed
+      data,
+      computed,
+      watch
     } = this.parserResult
     let md: RenderResult = {}
     if (props) {
@@ -75,6 +85,12 @@ export class Render {
     }
     if (mixIns) {
       md.mixIns = this.mixInRender(mixIns)
+    }
+    if (data) {
+      md.data = this.dataRender(data)
+    }
+    if (watch) {
+      md.watch = this.watchRender(watch)
     }
 
     return md
@@ -96,10 +112,10 @@ export class Render {
               desc = prop.describe.concat(prop.validatorDesc)
             }
           }
-          row.push(desc.join(''))
+          row.push(desc.join(' '))
         } else if (propConfig[i] === 'Type') {
           if (prop.typeDesc) {
-            row.push(prop.typeDesc.join(''))
+            row.push(prop.typeDesc.join(' '))
           } else if (!prop.type) {
             row.push('—')
           } else if (typeof prop.type === 'string') {
@@ -108,7 +124,7 @@ export class Render {
             row.push(
               prop.type
                 .map(t => `\`${t}\` / `)
-                .join('')
+                .join(' ')
                 .slice(0, -3)
             )
           } else {
@@ -124,9 +140,13 @@ export class Render {
           }
         } else if (propConfig[i] === 'Default') {
           if (prop.defaultDesc) {
-            row.push(prop.defaultDesc.join(''))
+            row.push(prop.defaultDesc.join(' '))
           } else if (prop.default) {
-            row.push(prop.default)
+            row.push(
+              typeof prop.default === 'object'
+                ? JSON.stringify(prop.default)
+                : prop.default
+            )
           } else {
             row.push('-')
           }
@@ -143,6 +163,26 @@ export class Render {
   slotRender(slotsRes: SlotResult[]) {
     const slotConfig = (this.options as RenderOptions).slots
     let code = this.renderTabelHeader(slotConfig)
+
+    // If the template and script contain slots with the same name,
+    // only the slots in the template are rendered
+    const slotInTemplate: SlotResult[] = []
+    const slotInScript: SlotResult[] = []
+    slotsRes.forEach((slot: SlotResult) => {
+      slot.target === 'template'
+        ? slotInTemplate.push(slot)
+        : slotInScript.push(slot)
+    })
+
+    slotsRes = slotInTemplate.concat(
+      slotInScript.filter(ss => {
+        for (let i = 0; i < slotInTemplate.length; i++) {
+          if (ss.name === slotInTemplate[i].name) return false
+        }
+        return true
+      })
+    )
+
     slotsRes.forEach((slot: SlotResult) => {
       const row: string[] = []
       for (let i = 0; i < slotConfig.length; i++) {
@@ -180,13 +220,13 @@ export class Render {
           row.push(event.name)
         } else if (eventConfig[i] === 'Description') {
           if (event.describe && event.describe.length) {
-            row.push(event.describe.join(''))
+            row.push(event.describe.join(' '))
           } else {
             row.push('-')
           }
         } else if (eventConfig[i] === 'Parameters') {
           if (event.argumentsDesc) {
-            row.push(event.argumentsDesc.join(''))
+            row.push(event.argumentsDesc.join(' '))
           } else {
             row.push('-')
           }
@@ -210,13 +250,13 @@ export class Render {
           row.push(method.name)
         } else if (methodConfig[i] === 'Description') {
           if (method.describe) {
-            row.push(method.describe.join(''))
+            row.push(method.describe.join(' '))
           } else {
             row.push('-')
           }
         } else if (methodConfig[i] === 'Parameters') {
           if (method.argumentsDesc) {
-            row.push(method.argumentsDesc.join(''))
+            row.push(method.argumentsDesc.join(' '))
           } else {
             row.push('-')
           }
@@ -233,16 +273,29 @@ export class Render {
   computedRender(computedRes: ComputedResult[]) {
     const computedConfig = (this.options as RenderOptions).computed
     let code = this.renderTabelHeader(computedConfig)
-    computedRes.forEach((method: MethodResult) => {
+    computedRes.forEach((computed: ComputedResult) => {
       const row: string[] = []
       for (let i = 0; i < computedConfig.length; i++) {
         if (computedConfig[i] === 'Computed') {
-          row.push(method.name)
-        } else if (computedConfig[i] === 'Description') {
-          if (method.describe) {
-            row.push(method.describe.join(''))
+          row.push(computed.name)
+        } else if (computedConfig[i] === 'Type') {
+          if (computed.type) {
+            row.push(`\`${computed.type.join(' ')}\``)
+            row.push()
           } else {
             row.push('-')
+          }
+        } else if (computedConfig[i] === 'Description') {
+          if (computed.describe) {
+            row.push(computed.describe.join(' '))
+          } else {
+            row.push('-')
+          }
+        } else if (computedConfig[i] === 'From Store') {
+          if (computed.isFromStore) {
+            row.push('Yes')
+          } else {
+            row.push('No')
           }
         } else {
           row.push('-')
@@ -262,6 +315,72 @@ export class Render {
       for (let i = 0; i < mixInsConfig.length; i++) {
         if (mixInsConfig[i] === 'MixIn') {
           row.push(mixIn.mixIn)
+        } else {
+          row.push('-')
+        }
+      }
+      code += this.renderTabelRow(row)
+    })
+
+    return code
+  }
+
+  dataRender(dataRes: DataResult[]) {
+    const dataConfig = (this.options as RenderOptions).data
+    let code = this.renderTabelHeader(dataConfig)
+    dataRes.forEach((data: DataResult) => {
+      const row: string[] = []
+      for (let i = 0; i < dataConfig.length; i++) {
+        if (dataConfig[i] === 'Name') {
+          row.push(data.name)
+        } else if (dataConfig[i] === 'Description') {
+          if (data.describe) {
+            row.push(data.describe.join(' '))
+          } else {
+            row.push('-')
+          }
+        } else if (dataConfig[i] === 'Type') {
+          if (data.type.length > 0) {
+            row.push(`\`${data.type}\``)
+          } else {
+            row.push('—')
+          }
+        } else if (dataConfig[i] === 'Default') {
+          if (data.default) {
+            row.push(data.default)
+          } else {
+            row.push('-')
+          }
+        } else {
+          row.push('-')
+        }
+      }
+      code += this.renderTabelRow(row)
+    })
+
+    return code
+  }
+
+  watchRender(watchRes: WatchResult[]) {
+    const watchConfig = (this.options as RenderOptions).watch
+    let code = this.renderTabelHeader(watchConfig)
+    watchRes.forEach((watch: WatchResult) => {
+      const row: string[] = []
+      for (let i = 0; i < watchConfig.length; i++) {
+        if (watchConfig[i] === 'Name') {
+          row.push(watch.name)
+        } else if (watchConfig[i] === 'Description') {
+          if (watch.describe) {
+            row.push(watch.describe.join(' '))
+          } else {
+            row.push('-')
+          }
+        } else if (watchConfig[i] === 'Parameters') {
+          if (watch.argumentsDesc) {
+            row.push(watch.argumentsDesc.join(' '))
+          } else {
+            row.push('-')
+          }
         } else {
           row.push('-')
         }
